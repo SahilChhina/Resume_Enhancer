@@ -20,7 +20,7 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://127.0.0.1:5000/enhance", {
+      const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com/enhance", {
         method: "POST",
         body: formData,
       });
@@ -30,7 +30,7 @@ function App() {
       const blob = await res.blob();
       const objectUrl = window.URL.createObjectURL(blob);
       setDownloadUrl(objectUrl);
-      setPreviewUrl("http://127.0.0.1:5000/preview");
+      setPreviewUrl("https://resume-enhancer-backend-rui4.onrender.com/preview");
 
       // Auto-download
       const link = document.createElement("a");
