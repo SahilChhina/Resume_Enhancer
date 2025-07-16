@@ -14,26 +14,32 @@ export default function App() {
 
     const formData = new FormData();
     formData.append("resume", resumeFile);
-    formData.append("jobDescription", jobDescription);
+    formData.append("jobDescription", jobDescription); // ✅ Must match Flask backend
 
-    const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com/enhance", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com/enhance", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.status === "success") {
-      setPdfUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.pdf_url + "?ts=" + Date.now());
-      setDocxUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.docx_url);
-    } else {
-      alert("Enhancement failed.");
+      if (res.ok && data.status === "success") {
+        setPdfUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.pdf_url + "?ts=" + Date.now());
+        setDocxUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.docx_url);
+      } else {
+        alert("Enhancement failed: " + (data.message || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("Error uploading:", error);
+      alert("Upload failed: " + error.message);
     }
   };
 
   return (
     <div>
       <h1>AI Resume Enhance</h1>
+
       <textarea
         value={jobDescription}
         onChange={(e) => setJobDescription(e.target.value)}
@@ -41,6 +47,7 @@ export default function App() {
         rows={10}
         style={{ width: "90%" }}
       />
+
       <br />
       <input type="file" accept=".docx" onChange={(e) => setResumeFile(e.target.files[0])} />
       <br />
