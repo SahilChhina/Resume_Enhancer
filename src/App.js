@@ -32,12 +32,8 @@ function App() {
       setDownloadUrl(objectUrl);
       setPreviewUrl("https://resume-enhancer-backend-rui4.onrender.com/preview");
 
-      // Auto-download
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = "enhanced_resume.docx";
-      link.click();
     } catch (err) {
+      console.error("Upload failed:", err);
       alert("Error uploading: " + err.message);
     } finally {
       setLoading(false);
@@ -48,11 +44,11 @@ function App() {
     <div className="min-h-screen bg-white px-6 py-10 font-sans">
       <header className="flex items-center justify-between mb-12">
         <div className="flex items-center gap-3">
-        <img
-  src={`${process.env.PUBLIC_URL}/logo.png`}
-  alt="logo"
-  className="w-12 h-18 object-contain"
-/>
+          <img
+            src={`${process.env.PUBLIC_URL}/logo.png`}
+            alt="logo"
+            className="w-12 h-18 object-contain"
+          />
           <h1 className="text-2xl font-bold text-gray-800">
             AI <span className="text-green-600 font-semibold">Resume</span> Enhance
           </h1>
@@ -86,17 +82,23 @@ function App() {
           </button>
 
           {downloadUrl && (
-            <button
-              onClick={() => {
-                const link = document.createElement("a");
-                link.href = downloadUrl;
-                link.download = "enhanced_resume.docx";
-                link.click();
-              }}
-              className="mt-3 ml-2 bg-white border border-green-600 text-green-600 hover:bg-green-50 px-6 py-2 rounded-lg font-medium"
-            >
-              Download Enhanced Resume (Word File)
-            </button>
+            <div className="flex flex-col mt-4 gap-3">
+              <a
+                href={downloadUrl}
+                download="enhanced_resume.docx"
+                className="bg-white border border-green-600 text-green-600 hover:bg-green-50 px-6 py-2 rounded-lg font-medium text-center"
+              >
+                Download Enhanced Resume (Word File)
+              </a>
+              <a
+                href="https://resume-enhancer-backend-rui4.onrender.com/preview"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white border border-green-600 text-green-600 hover:bg-green-50 px-6 py-2 rounded-lg font-medium text-center"
+              >
+                Download Enhanced Resume (PDF)
+              </a>
+            </div>
           )}
         </div>
 
@@ -121,11 +123,10 @@ function App() {
             </>
           ) : previewUrl ? (
             <iframe
-  src={previewUrl}
-  title="Resume Preview"
-  className="w-full h-[700px] border rounded-md shadow-lg"
-/>
-
+              src={previewUrl}
+              title="Resume Preview"
+              className="w-full h-[700px] border rounded-md shadow-lg"
+            />
           ) : (
             <div className="text-center">
               <p className="text-green-700 text-lg font-semibold mb-2">✅ Resume Selected</p>
