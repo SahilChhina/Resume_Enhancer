@@ -17,7 +17,7 @@ export default function App() {
     formData.append("jobDescription", jobDescription); // ✅ Must match Flask backend
 
     try {
-      const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com/enhance", {
+      const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com", {
         method: "POST",
         body: formData,
       });
