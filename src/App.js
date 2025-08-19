@@ -1,38 +1,56 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+
+const BASE_URL = "https://resume-enhancer-backend-rui4.onrender.com";
 
 export default function App() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
   const [pdfUrl, setPdfUrl] = useState("");
   const [docxUrl, setDocxUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Wake the Render server to avoid cold-start delay
+  useEffect(() => {
+    fetch(`${BASE_URL}/`).catch(() => {});
+  }, []);
 
   const handleEnhance = async () => {
-    if (!resumeFile || !jobDescription) {
+    if (!resumeFile || !jobDescription.trim()) {
       alert("Please upload a resume and paste a job description.");
       return;
     }
 
     const formData = new FormData();
     formData.append("resume", resumeFile);
-    formData.append("jobDescription", jobDescription); // ✅ Must match Flask backend
+    formData.append("jobDescription", jobDescription.trim());
 
     try {
-      const res = await fetch("https://resume-enhancer-backend-rui4.onrender.com", {
+      setLoading(true);
+      const res = await fetch(`${BASE_URL}/enhance`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        const txt = await res.text();
+        throw new Error(`Non-JSON response (HTTP ${res.status}): ${txt.slice(0, 200)}`);
+      }
 
       if (res.ok && data.status === "success") {
-        setPdfUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.pdf_url + "?ts=" + Date.now());
-        setDocxUrl("https://resume-enhancer-backend-rui4.onrender.com" + data.docx_url);
+        const ts = Date.now();
+        if (data.pdf_url) setPdfUrl(`${BASE_URL}${data.pdf_url}?ts=${ts}`);
+        setDocxUrl(`${BASE_URL}${data.docx_url}?ts=${ts}`);
       } else {
-        alert("Enhancement failed: " + (data.message || "Unknown error"));
+        throw new Error(data?.message || `HTTP ${res.status}`);
       }
     } catch (error) {
       console.error("Error uploading:", error);
-      alert("Upload failed: " + error.message);
+      alert("Upload failed: " + (error.message || "Unknown error"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -51,7 +69,9 @@ export default function App() {
       <br />
       <input type="file" accept=".docx" onChange={(e) => setResumeFile(e.target.files[0])} />
       <br />
-      <button onClick={handleEnhance}>Enhance Resume</button>
+      <button onClick={handleEnhance} disabled={loading}>
+        {loading ? "Enhancing..." : "Enhance Resume"}
+      </button>
 
       {pdfUrl && (
         <>
@@ -63,11 +83,15 @@ export default function App() {
             height="600px"
             style={{ border: "1px solid #ccc" }}
           />
-          <br />
+        </>
+      )}
+
+      {docxUrl && (
+        <p>
           <a href={docxUrl} download>
             Download Enhanced Resume (Word File)
           </a>
-        </>
+        </p>
       )}
     </div>
   );
