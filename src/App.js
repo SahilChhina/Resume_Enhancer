@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-const BASE_URL = "https://resume-enhancer-backend-rui4.onrender.com";
+const BASE_URL = "https://resume-enhancer-backend-rui4.onrender.com"; // exact
 
 export default function App() {
   const [resumeFile, setResumeFile] = useState(null);
@@ -9,34 +9,31 @@ export default function App() {
   const [docxUrl, setDocxUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Wake the Render server to avoid cold-start delay
-  useEffect(() => {
-    fetch(`${BASE_URL}/`).catch(() => {});
-  }, []);
+  // Wake Render (cold start)
+  useEffect(() => { fetch(`${BASE_URL}/`).catch(()=>{}); }, []);
 
   const handleEnhance = async () => {
-    if (!resumeFile || !jobDescription.trim()) {
-      alert("Please upload a resume and paste a job description.");
-      return;
-    }
+    if (!resumeFile) { alert("Please upload a resume."); return; }
+    if (!jobDescription.trim()) { alert("Please paste a job description."); return; }
 
     const formData = new FormData();
     formData.append("resume", resumeFile);
     formData.append("jobDescription", jobDescription.trim());
 
+    // Debug: confirm what we're sending
+    for (const [k,v] of formData.entries()) {
+      console.log("FormData ->", k, v instanceof File ? v.name : v);
+    }
+
     try {
       setLoading(true);
-      const res = await fetch(`${BASE_URL}/enhance`, {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(`${BASE_URL}/enhance`, { method: "POST", body: formData });
 
       let data;
-      try {
-        data = await res.json();
-      } catch {
+      try { data = await res.json(); }
+      catch {
         const txt = await res.text();
-        throw new Error(`Non-JSON response (HTTP ${res.status}): ${txt.slice(0, 200)}`);
+        throw new Error(`Non-JSON (HTTP ${res.status}): ${txt.slice(0,200)}`);
       }
 
       if (res.ok && data.status === "success") {
@@ -46,9 +43,9 @@ export default function App() {
       } else {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
-    } catch (error) {
-      console.error("Error uploading:", error);
-      alert("Upload failed: " + (error.message || "Unknown error"));
+    } catch (err) {
+      console.error(err);
+      alert(`Upload failed: ${err.message || "Unknown error"}`);
     } finally {
       setLoading(false);
     }
@@ -76,23 +73,10 @@ export default function App() {
       {pdfUrl && (
         <>
           <h2>Preview</h2>
-          <iframe
-            src={pdfUrl}
-            title="Resume Preview"
-            width="100%"
-            height="600px"
-            style={{ border: "1px solid #ccc" }}
-          />
+          <iframe src={pdfUrl} title="Resume Preview" width="100%" height="600" style={{border:"1px solid #ccc"}} />
         </>
       )}
-
-      {docxUrl && (
-        <p>
-          <a href={docxUrl} download>
-            Download Enhanced Resume (Word File)
-          </a>
-        </p>
-      )}
+      {docxUrl && <p><a href={docxUrl} download>Download Enhanced Resume (Word File)</a></p>}
     </div>
   );
 }
