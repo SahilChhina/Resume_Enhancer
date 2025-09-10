@@ -1,11 +1,11 @@
 // src/App.js
 import React, { useEffect, useState } from "react";
 
-// Render backend root (no trailing slash)
+// Your Docker backend URL (no trailing slash)
 const BASE_URL = "https://resume-enhancer-backend-1.onrender.com";
 
-// Use absolute URLs as-is; otherwise prefix with backend base
-const makeUrl = (u) => {
+// Helper: use URL as-is if absolute; otherwise prefix with backend base
+const asBackendUrl = (u) => {
   if (!u) return "";
   const s = String(u);
   return (s.startsWith("http://") || s.startsWith("https://")) ? s : `${BASE_URL}${s}`;
@@ -14,12 +14,12 @@ const makeUrl = (u) => {
 export default function App() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
-  const [pdfUrl, setPdfUrl] = useState("");    // optional preview
-  const [docxUrl, setDocxUrl] = useState("");  // download link
+  const [pdfUrl, setPdfUrl] = useState("");    // optional preview (PDF)
+  const [docxUrl, setDocxUrl] = useState("");  // download link (DOCX)
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Warm the backend (avoid cold start delay)
+  // Warm the backend once (reduces cold-start delay on free tier)
   useEffect(() => { fetch(`${BASE_URL}/`).catch(() => {}); }, []);
 
   const handleEnhance = async () => {
@@ -32,12 +32,14 @@ export default function App() {
 
     const formData = new FormData();
     formData.append("resume", resumeFile);
-    formData.append("jobDescription", jobDescription.trim()); // backend accepts multiple keys
+    formData.append("jobDescription", jobDescription.trim());
 
     try {
       setLoading(true);
+
       const res = await fetch(`${BASE_URL}/enhance`, { method: "POST", body: formData });
 
+      // Ensure JSON (better error messages)
       let data;
       try {
         data = await res.json();
@@ -50,10 +52,10 @@ export default function App() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
-      // Use URLs exactly as returned; avoid query strings on Word file
-      if (data.pdf_url) setPdfUrl(makeUrl(data.pdf_url));
-      setDocxUrl(makeUrl(data.docx_url));
-      if (data.message) setMsg(data.message);
+      // Use URLs exactly as returned; no query strings for the DOCX
+      setDocxUrl(asBackendUrl(data.docx_url));
+      setPdfUrl(asBackendUrl(data.pdf_url)); // may be empty/null if PDF not generated
+      setMsg(data.message || "");
     } catch (err) {
       console.error(err);
       alert(`Enhance failed: ${err.message || "Unknown error"}`);
@@ -63,7 +65,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
       <h1>AI Resume Enhance</h1>
       <p>Paste a job description and upload your <strong>.docx</strong> resume.</p>
 
@@ -91,6 +93,7 @@ export default function App() {
 
       {msg && <p style={{ marginTop: 8, color: "#666" }}>{msg}</p>}
 
+      {/* Show PDF preview only if backend returned a PDF */}
       {pdfUrl && (
         <>
           <h2 style={{ marginTop: 16 }}>Preview</h2>
@@ -104,11 +107,12 @@ export default function App() {
         </>
       )}
 
+      {/* DOCX download */}
       {docxUrl && (
         <p style={{ marginTop: 16 }}>
           <a href={docxUrl} download>Download Enhanced Resume (Word File)</a>
         </p>
       )}
-    </div>
+    </main>
   );
 }
