@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 
 // Render backend root (no trailing slash)
-const BASE_URL = "https://resume-enhancer-backend-rui4.onrender.com";
+const BASE_URL = "https://resume-enhancer-backend-1.onrender.com";
 
 // Use absolute URLs as-is; otherwise prefix with backend base
 const makeUrl = (u) => {
