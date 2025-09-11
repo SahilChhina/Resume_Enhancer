@@ -14,12 +14,12 @@ const asBackendUrl = (u) => {
 export default function App() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
-  const [pdfUrl, setPdfUrl] = useState("");    // optional preview (PDF)
-  const [docxUrl, setDocxUrl] = useState("");  // download link (DOCX)
+  const [pdfUrl, setPdfUrl] = useState("");    // preview (PDF) if available
+  const [docxUrl, setDocxUrl] = useState("");  // download (DOCX)
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Warm the backend once (reduces cold-start delay on free tier)
+  // Warm the backend once (free tier cold-start)
   useEffect(() => { fetch(`${BASE_URL}/`).catch(() => {}); }, []);
 
   const handleEnhance = async () => {
@@ -39,7 +39,7 @@ export default function App() {
 
       const res = await fetch(`${BASE_URL}/enhance`, { method: "POST", body: formData });
 
-      // Ensure JSON (better error messages)
+      // Make sure we actually got JSON
       let data;
       try {
         data = await res.json();
@@ -52,9 +52,9 @@ export default function App() {
         throw new Error(data?.message || `HTTP ${res.status}`);
       }
 
-      // Use URLs exactly as returned; no query strings for the DOCX
+      // Use URLs exactly as returned (no query strings)
       setDocxUrl(asBackendUrl(data.docx_url));
-      setPdfUrl(asBackendUrl(data.pdf_url)); // may be empty/null if PDF not generated
+      setPdfUrl(asBackendUrl(data.pdf_url));   // may be empty/null if not generated
       setMsg(data.message || "");
     } catch (err) {
       console.error(err);
@@ -93,7 +93,7 @@ export default function App() {
 
       {msg && <p style={{ marginTop: 8, color: "#666" }}>{msg}</p>}
 
-      {/* Show PDF preview only if backend returned a PDF */}
+      {/* Show PDF preview only if backend actually returned a PDF URL */}
       {pdfUrl && (
         <>
           <h2 style={{ marginTop: 16 }}>Preview</h2>
@@ -107,7 +107,7 @@ export default function App() {
         </>
       )}
 
-      {/* DOCX download */}
+      {/* Show DOCX download only after success */}
       {docxUrl && (
         <p style={{ marginTop: 16 }}>
           <a href={docxUrl} download>Download Enhanced Resume (Word File)</a>
