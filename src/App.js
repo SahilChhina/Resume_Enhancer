@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 const BASE_URL = (
   process.env.REACT_APP_BACKEND_URL ||
-  "https://resume-enhancer-backend-1.onrender.com"
+  "https://resumeenhancerbackend-production.up.railway.app"
 ).replace(/\/$/, "");
 
 const asBackendUrl = (u) => {
@@ -12,11 +12,11 @@ const asBackendUrl = (u) => {
 };
 
 const STAGES = [
-  "Uploading resume",
-  "Reading document",
-  "Calling Claude",
-  "Rewriting bullets",
-  "Generating preview",
+  { label: "Uploading resume", pct: 15 },
+  { label: "Reading document", pct: 30 },
+  { label: "Calling Claude AI", pct: 55 },
+  { label: "Rewriting bullets", pct: 80 },
+  { label: "Generating preview", pct: 95 },
 ];
 
 export default function App() {
@@ -34,7 +34,6 @@ export default function App() {
   const inputRef = useRef(null);
   const stageTimer = useRef(null);
 
-  // Warm the backend (free tier cold-start)
   useEffect(() => {
     fetch(`${BASE_URL}/`)
       .then((r) => r.json())
@@ -47,7 +46,7 @@ export default function App() {
   const acceptFile = (f) => {
     if (!f) return;
     if (!f.name.toLowerCase().endsWith(".docx")) {
-      setError("Please upload a .docx file.");
+      setError("Only .docx files are supported.");
       return;
     }
     setError("");
@@ -60,15 +59,18 @@ export default function App() {
     acceptFile(e.dataTransfer.files?.[0]);
   }, []);
 
-  const handleEnhance = async () => {
+  const reset = () => {
     setError("");
     setMsg("");
     setPdfUrl("");
     setDocxUrl("");
     setStats(null);
+  };
 
+  const handleEnhance = async () => {
+    reset();
     if (!resumeFile) return setError("Upload a .docx resume first.");
-    if (!jobDescription.trim()) return setError("Paste the job description.");
+    if (!jobDescription.trim()) return setError("Paste a job description.");
 
     const formData = new FormData();
     formData.append("resume", resumeFile);
@@ -78,14 +80,10 @@ export default function App() {
     setStageIdx(0);
     stageTimer.current = setInterval(() => {
       setStageIdx((i) => (i < STAGES.length - 1 ? i + 1 : i));
-    }, 4000);
+    }, 4500);
 
     try {
-      const res = await fetch(`${BASE_URL}/enhance`, {
-        method: "POST",
-        body: formData,
-      });
-
+      const res = await fetch(`${BASE_URL}/enhance`, { method: "POST", body: formData });
       let data;
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
@@ -94,18 +92,11 @@ export default function App() {
         const txt = await res.text();
         throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
       }
-
-      if (!res.ok || data.status !== "success") {
-        throw new Error(data?.message || `HTTP ${res.status}`);
-      }
-
+      if (!res.ok || data.status !== "success") throw new Error(data?.message || `HTTP ${res.status}`);
       setDocxUrl(asBackendUrl(data.docx_url));
       setPdfUrl(asBackendUrl(data.pdf_url));
       setMsg(data.message || "");
-      setStats({
-        applied: data.changes_applied,
-        total: data.paragraphs_total,
-      });
+      setStats({ applied: data.changes_applied, total: data.paragraphs_total });
     } catch (err) {
       setError(err.message || "Enhancement failed.");
     } finally {
@@ -114,135 +105,150 @@ export default function App() {
     }
   };
 
+  const canSubmit = !loading && !!resumeFile && !!jobDescription.trim();
+  const stage = STAGES[stageIdx];
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-            AI Resume Enhancer
-          </h1>
-          <p className="text-slate-600 mt-2">
-            Tailor your resume to a job description using Claude. Your existing experience,
-            formatting, and dates are preserved — only the phrasing is sharpened.
+    <div className="min-h-screen bg-slate-950 text-white">
+
+      {/* Hero */}
+      <header className="border-b border-slate-800 bg-slate-950">
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-semibold tracking-widest text-indigo-400 uppercase">Powered by Claude</span>
+          </div>
+          <h1 className="text-5xl font-bold tracking-tight text-white">AI Resume Enhancer</h1>
+          <p className="mt-3 text-slate-400 text-lg max-w-2xl">
+            Paste a job description, upload your resume — Claude rewrites your bullets to match the role
+            while keeping your formatting, fonts, and facts intact.
           </p>
           {backendReady === false && (
-            <div className="mt-3 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded px-3 py-2">
-              Backend not ready (cold start or missing API key). First request may take ~30s.
+            <div className="mt-4 inline-flex items-center gap-2 text-sm bg-amber-950 border border-amber-800 text-amber-300 rounded-lg px-4 py-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              Backend warming up — first request may take ~30s
             </div>
           )}
-        </header>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Job Description */}
-          <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Job Description
-            </label>
-            <textarea
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the full job description here…"
-              rows={14}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              {jobDescription.length} characters
-            </p>
-          </section>
-
-          {/* Resume Upload */}
-          <section className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Resume (.docx)
-            </label>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-              onClick={() => inputRef.current?.click()}
-              className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition ${
-                dragging
-                  ? "border-indigo-500 bg-indigo-50"
-                  : resumeFile
-                  ? "border-emerald-400 bg-emerald-50"
-                  : "border-slate-300 hover:border-slate-400 bg-slate-50"
-              }`}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".docx"
-                onChange={(e) => acceptFile(e.target.files?.[0])}
-                className="hidden"
-              />
-              {resumeFile ? (
-                <div>
-                  <div className="text-emerald-700 font-medium">{resumeFile.name}</div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    {(resumeFile.size / 1024).toFixed(1)} KB — click to replace
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="text-slate-700 font-medium">
-                    Drop your resume here, or click to browse
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">.docx only, max 20 MB</div>
-                </div>
-              )}
+          {backendReady === true && (
+            <div className="mt-4 inline-flex items-center gap-2 text-sm text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              Backend ready
             </div>
-
-            <button
-              onClick={handleEnhance}
-              disabled={loading || !resumeFile || !jobDescription.trim()}
-              className="mt-5 w-full rounded-lg bg-indigo-600 text-white font-medium py-3 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition"
-            >
-              {loading ? "Enhancing…" : "Enhance Resume"}
-            </button>
-
-            {loading && (
-              <div className="mt-4">
-                <div className="text-sm text-slate-600 mb-2">{STAGES[stageIdx]}…</div>
-                <div className="h-1.5 w-full bg-slate-200 rounded overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-600 transition-all duration-500"
-                    style={{ width: `${((stageIdx + 1) / STAGES.length) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-3 text-sm bg-red-50 border border-red-200 text-red-700 rounded px-3 py-2">
-                {error}
-              </div>
-            )}
-          </section>
+          )}
         </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+
+        {/* Step 1 — Job Description */}
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">1</span>
+            <h2 className="text-lg font-semibold text-white">Paste the Job Description</h2>
+          </div>
+          <textarea
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            placeholder="Paste the full job description here…"
+            rows={10}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+          />
+          <p className="text-xs text-slate-500 mt-2">{jobDescription.length} characters</p>
+        </section>
+
+        {/* Step 2 — Upload */}
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">2</span>
+            <h2 className="text-lg font-semibold text-white">Upload Your Resume</h2>
+          </div>
+
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+            className={`cursor-pointer rounded-xl border-2 border-dashed p-10 text-center transition-all ${
+              dragging
+                ? "border-indigo-400 bg-indigo-950"
+                : resumeFile
+                ? "border-emerald-500 bg-emerald-950"
+                : "border-slate-700 hover:border-slate-500 bg-slate-800"
+            }`}
+          >
+            <input ref={inputRef} type="file" accept=".docx" onChange={(e) => acceptFile(e.target.files?.[0])} className="hidden" />
+            {resumeFile ? (
+              <div>
+                <div className="text-2xl mb-2">✓</div>
+                <div className="text-emerald-300 font-medium">{resumeFile.name}</div>
+                <div className="text-slate-400 text-sm mt-1">{(resumeFile.size / 1024).toFixed(1)} KB — click to replace</div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl mb-3 text-slate-500">↑</div>
+                <div className="text-slate-300 font-medium">Drop your resume here, or click to browse</div>
+                <div className="text-slate-500 text-sm mt-1">.docx only · max 20 MB</div>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="mt-3 text-sm bg-red-950 border border-red-800 text-red-300 rounded-lg px-4 py-3">
+              {error}
+            </div>
+          )}
+        </section>
+
+        {/* Step 3 — Enhance */}
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center flex-shrink-0">3</span>
+            <h2 className="text-lg font-semibold text-white">Enhance</h2>
+          </div>
+
+          <button
+            onClick={handleEnhance}
+            disabled={!canSubmit}
+            className="w-full rounded-xl py-4 font-semibold text-base transition-all bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
+          >
+            {loading ? "Enhancing…" : "Enhance Resume"}
+          </button>
+
+          {loading && (
+            <div className="mt-5">
+              <div className="flex justify-between text-xs text-slate-400 mb-2">
+                <span>{stage.label}…</span>
+                <span>{stage.pct}%</span>
+              </div>
+              <div className="h-1.5 w-full bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 rounded-full transition-all duration-700"
+                  style={{ width: `${stage.pct}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Results */}
         {(docxUrl || pdfUrl) && (
-          <section className="mt-8 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <section className="bg-slate-900 border border-emerald-800 rounded-2xl p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Enhanced Resume</h2>
+                <h2 className="text-xl font-bold text-white">Enhanced Resume</h2>
                 {stats && (
-                  <p className="text-sm text-slate-500 mt-1">
-                    Rewrote {stats.applied} of {stats.total} paragraphs.
+                  <p className="text-slate-400 text-sm mt-1">
+                    Claude rewrote <span className="text-emerald-400 font-medium">{stats.applied}</span> of {stats.total} paragraphs.
                   </p>
                 )}
-                {msg && <p className="text-xs text-amber-700 mt-1">{msg}</p>}
+                {msg && <p className="text-amber-400 text-xs mt-1">{msg}</p>}
               </div>
               {docxUrl && (
                 <a
                   href={docxUrl}
                   download
-                  className="rounded-lg bg-emerald-600 text-white font-medium px-4 py-2 hover:bg-emerald-700"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-5 py-3 transition-all"
                 >
-                  Download .docx
+                  ↓ Download .docx
                 </a>
               )}
             </div>
@@ -250,20 +256,23 @@ export default function App() {
               <iframe
                 src={pdfUrl}
                 title="Resume preview"
-                className="w-full h-[800px] border border-slate-200 rounded"
+                className="w-full h-[850px] rounded-xl border border-slate-700"
               />
             ) : (
-              <div className="text-sm text-slate-500 italic">
-                PDF preview unavailable on this deployment. Download the .docx above.
+              <div className="text-center py-10 text-slate-500 text-sm border border-slate-800 rounded-xl">
+                PDF preview unavailable on this deployment — download the .docx above.
               </div>
             )}
           </section>
         )}
+      </main>
 
-        <footer className="mt-10 text-center text-xs text-slate-400">
-          Built with Claude
-        </footer>
-      </div>
-    </main>
+      <footer className="border-t border-slate-800 mt-10">
+        <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between text-xs text-slate-600">
+          <span>AI Resume Enhancer</span>
+          <span>Built with Claude</span>
+        </div>
+      </footer>
+    </div>
   );
 }
